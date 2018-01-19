@@ -6,7 +6,7 @@ require 'open3'
 require 'logger'
 
 @log = Logger.new("logs/ruby_builder.log")
-@log.level = Logger::DEBUG
+@log.level = Logger::INFO
 
 class Repo
   attr_accessor :versions
@@ -99,6 +99,7 @@ repo = Repo.new
 e = ERB.new(File.read("Dockerfile.erb"))
 @log.debug "Iterating over release versions of ruby"
 for @version in repo.gzs.select {|v| !v.excluded? }
+  @log.info "Initiating build for: #{@version.release}"
   begin
     @log.debug "Creating version directory for: #{@version.release}"
     dir = Dir.mkdir(@version.release)
@@ -127,5 +128,15 @@ for @version in repo.gzs.select {|v| !v.excluded? }
     else
       @log.info "Build successful for #{@version.release}"
     end
+  end
+
+  @log.debug "Deleting ruby directory for: #{@version.release}"
+  nothing = FileUtils.rm_rf(@version.release)
+  @log.debug "Pushing the docker image for: #{@version.release}"
+  stdout, stderr, status = Open3.capture3("docker push prandium/centos-ruby:#{@version.release}")
+  if stderr.empty?
+    @log.info "Docker push successful for #{@version.release}"
+  else
+    @log.error "Docker push failed! Error message: #{stderr}"
   end
 end 
